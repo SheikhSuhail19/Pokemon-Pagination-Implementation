@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import PokemonList from './PokemonList';
-import axios from 'axios';
 import Pagination from './Pagination';
 
 function App() {
@@ -10,24 +9,29 @@ function App() {
   const [ prevPageUrl, setPrevPageUrl ] = useState("https://pokeapi.co/api/v2/pokemon?offset=20&limit=20");
   const [ loading, setLoading ] = useState(true);
 
-
   useEffect(() => {
     setLoading(true);
-    let cancel;
-    axios.get(currentPageUrl, {
-      cancelToken: new axios.CancelToken(c => cancel = c)
-    }).then(res => {
-      setLoading(false);
-      setNextPageUrl(res.data.next);
-      setPrevPageUrl(res.data.previous);
-      setPokemon(res.data.results.map(p => p.name));
-    });
 
+    let controller = new AbortController();
 
-    return () => cancel();
+    fetch(currentPageUrl, { signal: controller.signal })
+      .then((response) => response.json())
+      .then((data) => {
+        setLoading(false);
+        setNextPageUrl(data.next);
+        setPrevPageUrl(data.previous);
+        setPokemon(data.results.map((p) => p.name));
+      })
+      .catch((error) => {
+        if (error.name === 'AbortError') {
+          console.log('Request was canceled');
+        } else {
+          console.error('Error:', error);
+        }
+      });
 
+    return () => controller.abort();
   }, [ currentPageUrl ]);
-
 
   function gotoNextPage() {
     setCurrentPageUrl(nextPageUrl);
@@ -37,9 +41,7 @@ function App() {
     setCurrentPageUrl(prevPageUrl);
   }
 
-
   if (loading) return "Loading...";
-
 
   return (
     <>
